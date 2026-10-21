@@ -26,7 +26,13 @@ This personal build is ad-hoc signed and is not notarized by Apple. macOS may re
 
 1. Click **Start Recording**.
 2. Allow screen and system audio recording when macOS asks.
-3. If access is denied, click **Open Permissions**, enable Screen Recorder under **Privacy & Security → Screen & System Audio Recording**, then quit and reopen the app. If this happens after rebuilding or replacing the app, switch its permission off and on again: ad-hoc signed builds can be treated as a different app by macOS.
+3. If access is denied, click **Open Permissions**, enable Screen Recorder under **Privacy & Security → Screen & System Audio Recording**, then quit and reopen the app. Ad-hoc signed builds can be treated as a different app by macOS after rebuilding or replacing the app. If switching permission off and on does not help, quit Screen Recorder completely, run the following command in Terminal, then reopen the app and approve access again:
+
+   ```sh
+   tccutil reset ScreenCapture se.bergsland.screenrecorder
+   ```
+
+   This resets only this app's screen recording approval.
 4. Click **Stop & Save** to finish.
 
 The app records the main display. There is currently no display/window/region selector, microphone option, pause button, or global stop shortcut. Protected content may not be captured.
@@ -47,4 +53,4 @@ open "build/Screen Recorder.app"
 
 ## Validation
 
-The app was compiled and opened on macOS 26.5.1. The underlying command-line implementation produced a test MP4 with H.264 video and stereo AAC audio. A full recording through the graphical app still requires its separate macOS permission and has not yet been verified.
+The graphical app was tested on macOS 26.5.1: recording started, Stop & Save completed, and the resulting approximately nine-second MP4 was verified to contain 1728 × 1116 H.264 video and stereo 48 kHz AAC audio. Screen recording permission was recovered after an app rebuild by resetting this app’s ScreenCapture approval and approving it again.

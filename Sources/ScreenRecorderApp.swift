@@ -143,49 +143,77 @@ import AVFoundation
 
 struct RecorderView: View {
     @ObservedObject var model: RecorderModel
+    private var folderLabel: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return model.folder.deletingLastPathComponent().path.replacingOccurrences(of: home, with: "~")
+    }
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "record.circle").font(.system(size: 48)).foregroundStyle(model.recording ? .red : .accentColor)
-            VStack(spacing: 6) {
-                Text("Screen Recorder").font(.title2.bold())
-                Text(model.includeVideo ? "Main screen + computer sound" : "Computer sound only").foregroundStyle(.secondary)
-            }
-            VStack(alignment: .leading, spacing: 14) {
-                Picker("Record", selection: $model.includeVideo) {
-                    Text("Screen + Audio (MP4)").tag(true)
-                    Text("Audio Only (M4A)").tag(false)
-                }.pickerStyle(.segmented)
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Save to").font(.caption).foregroundStyle(.secondary)
-                        Text(model.folder.path).font(.callout).lineLimit(2).truncationMode(.middle).help(model.folder.path)
-                    }
-                    Spacer()
-                    Button("Choose…") { model.chooseFolder() }
+        VStack(spacing: 24) {
+            HStack(spacing: 14) {
+                if let icon = NSImage(contentsOf: Bundle.main.url(forResource: "AppIcon", withExtension: "icns") ?? URL(fileURLWithPath: "")) {
+                    Image(nsImage: icon).resizable().frame(width: 56, height: 56)
                 }
-            }.disabled(model.recording || model.busy)
-            HStack(spacing: 8) {
-                Circle().fill(model.recording ? Color.red : Color.secondary.opacity(0.5)).frame(width: 8, height: 8)
-                Text(model.phase).fontWeight(.medium)
-                if model.recording { Text(String(format: "%02d:%02d", model.elapsed / 60, model.elapsed % 60)).monospacedDigit() }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Screen Recorder").font(.system(size: 22, weight: .semibold))
+                    Text("Capture a moment. Keep the sound.").font(.callout).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
-            Button(action: { model.recording ? model.stop() : model.start() }) {
-                Label(model.recording ? "Stop & Save" : "Start Recording", systemImage: model.recording ? "stop.fill" : "record.circle")
-                    .frame(width: 210, height: 28)
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("RECORDING").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+                    Picker("Recording mode", selection: $model.includeVideo) {
+                        Text("Screen & Audio").tag(true)
+                        Text("Audio Only").tag(false)
+                    }.pickerStyle(.segmented).labelsHidden().controlSize(.large)
+                    Text(model.includeVideo ? "Main display and computer sound · MP4" : "Computer sound without video · M4A")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Divider()
+                HStack(spacing: 12) {
+                    Image(systemName: "folder").font(.system(size: 22)).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.folder.lastPathComponent).font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle)
+                        Text(folderLabel).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }.help(model.folder.path)
+                    Spacer(minLength: 8)
+                    Button("Choose…") { model.chooseFolder() }.fixedSize()
+                }
             }
-            .buttonStyle(.borderedProminent).controlSize(.large).disabled(model.busy)
-            Text(model.message).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Open Recordings") { model.openFolder() }
+            .padding(18)
+            .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14))
+            .disabled(model.recording || model.busy)
+            VStack(spacing: 14) {
+                HStack(spacing: 7) {
+                    Circle().fill(model.recording ? Color.red : Color.secondary.opacity(0.5)).frame(width: 7, height: 7)
+                    Text(model.phase).font(.callout.weight(.medium))
+                    if model.recording {
+                        Text(String(format: "%02d:%02d", model.elapsed / 60, model.elapsed % 60)).monospacedDigit().font(.callout)
+                    }
+                }.frame(height: 18)
+                Button(action: { model.recording ? model.stop() : model.start() }) {
+                    Label(model.recording ? "Stop & Save" : "Start Recording", systemImage: model.recording ? "stop.fill" : "record.circle")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity).frame(height: 30)
+                }.buttonStyle(.borderedProminent).controlSize(.large).tint(model.recording ? .red : .accentColor).disabled(model.busy)
                 if model.phase == "Couldn’t record" {
+                    Text(model.message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                     Button("Open Permissions") {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") { NSWorkspace.shared.open(url) }
                     }
                 }
-                if let file = model.lastFile { Button("Play Latest") { NSWorkspace.shared.open(file) } }
             }
-            Text(model.includeVideo ? "MP4 · Up to 1920 px wide · 30 fps · Microphone off" : "M4A · Stereo audio · Microphone off").font(.caption).foregroundStyle(.tertiary)
-        }.padding(30).frame(width: 390)
+            HStack {
+                Button(action: { model.openFolder() }) { Label("Recordings", systemImage: "folder") }
+                Spacer()
+                if let file = model.lastFile {
+                    Button(action: { NSWorkspace.shared.open(file) }) { Label("Play Latest", systemImage: "play.circle") }
+                } else {
+                    Label("Microphone off", systemImage: "mic.slash").font(.caption).foregroundStyle(.secondary)
+                }
+            }.buttonStyle(.borderless).font(.callout)
+        }
+        .padding(28).frame(width: 420)
     }
 }
 @main struct ScreenRecorderApp: App {

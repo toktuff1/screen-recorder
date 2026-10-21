@@ -6,6 +6,7 @@ A small native Mac app that records your main screen and computer sound to an MP
 
 ## Features
 
+- Native macOS layout with full-width recording controls and clear settings
 - Start Recording and Stop & Save buttons
 - Recording status and elapsed time
 - Open Recordings and Play Latest buttons
@@ -56,3 +57,5 @@ open "build/Screen Recorder.app"
 ## Validation
 
 The graphical app was tested on macOS 26.5.1: recording started, Stop & Save completed, and the resulting approximately nine-second MP4 was verified to contain 1728 × 1116 H.264 video and stereo 48 kHz AAC audio. Screen recording permission was recovered after an app rebuild by resetting this app’s ScreenCapture approval and approving it again.
+
+Version 1.1 validation: audio-only recording was started and saved through the graphical app; the resulting M4A was verified to contain AAC audio and no video stream. Folder selection and remembered audio mode were checked in the app. The refined layout was visually checked for clipped labels. The final rebuilt app requires renewed screen recording approval before another full recording test.

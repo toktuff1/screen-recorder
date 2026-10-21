@@ -16,7 +16,23 @@ import AVFoundation
     private var timer: Timer?
     private var started = Date()
     var quitWhenFinished = false
-    let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Screen Recordings", isDirectory: true)
+    @Published var includeVideo = UserDefaults.standard.object(forKey: "includeVideo") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(includeVideo, forKey: "includeVideo") }
+    }
+    @Published var folder = URL(fileURLWithPath: UserDefaults.standard.string(forKey: "saveFolder") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Screen Recordings").path, isDirectory: true)
+    private var capturedFile: URL?
+    private var audioOnly = false
+
+    func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose where to save recordings"
+        panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false; panel.canCreateDirectories = true
+        panel.directoryURL = folder
+        if panel.runModal() == .OK, let url = panel.url {
+            folder = url; UserDefaults.standard.set(url.path, forKey: "saveFolder")
+        }
+    }
 
     func start() {
         guard !busy && !recording else { return }
@@ -41,9 +57,13 @@ import AVFoundation
                 config.excludesCurrentProcessAudio = true
                 config.sampleRate = 48000; config.channelCount = 2; config.captureMicrophone = false
                 let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-                let file = folder.appendingPathComponent("Screen \(formatter.string(from: Date()))-\(UUID().uuidString.prefix(4)).mp4")
+                audioOnly = !includeVideo
+                let name = "\(audioOnly ? "Audio" : "Screen") \(formatter.string(from: Date()))-\(UUID().uuidString.prefix(8))"
+                let file = folder.appendingPathComponent(name + (audioOnly ? ".m4a" : ".mp4"))
+                let captureFile = audioOnly ? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4") : file
+                capturedFile = captureFile
                 let settings = SCRecordingOutputConfiguration()
-                settings.outputURL = file; settings.videoCodecType = .h264; settings.outputFileType = .mp4
+                settings.outputURL = captureFile; settings.videoCodecType = .h264; settings.outputFileType = .mp4
                 let sink = SCRecordingOutput(configuration: settings, delegate: self)
                 let capture = SCStream(filter: filter, configuration: config, delegate: self)
                 try capture.addRecordingOutput(sink)
@@ -70,11 +90,22 @@ import AVFoundation
     nonisolated func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
         Task { @MainActor in
             self.timer?.invalidate(); self.timer = nil
-            self.lastFile = self.pendingFile; self.pendingFile = nil
-            self.recording = false; self.busy = false; self.phase = "Saved"
-            self.message = "Your recording is ready in Movies → Screen Recordings."
+            self.recording = false; self.busy = true; self.phase = "Saving…"
             self.stream = nil; self.output = nil
-            if self.quitWhenFinished { NSApp.reply(toApplicationShouldTerminate: true) }
+            do {
+                if self.audioOnly, let source = self.capturedFile, let destination = self.pendingFile {
+                    let asset = AVURLAsset(url: source)
+                    guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                        throw NSError(domain: "Recorder", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not create audio file. Temporary recording kept at: \(source.path)"])
+                    }
+                    try await exporter.export(to: destination, as: .m4a)
+                    try? FileManager.default.removeItem(at: source)
+                }
+                self.lastFile = self.pendingFile; self.pendingFile = nil; self.capturedFile = nil
+                self.busy = false; self.phase = "Saved"
+                self.message = "Saved to \(self.folder.path)"
+                if self.quitWhenFinished { NSApp.reply(toApplicationShouldTerminate: true) }
+            } catch { self.fail(error) }
         }
     }
     nonisolated func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
@@ -117,8 +148,22 @@ struct RecorderView: View {
             Image(systemName: "record.circle").font(.system(size: 48)).foregroundStyle(model.recording ? .red : .accentColor)
             VStack(spacing: 6) {
                 Text("Screen Recorder").font(.title2.bold())
-                Text("Main screen + computer sound").foregroundStyle(.secondary)
+                Text(model.includeVideo ? "Main screen + computer sound" : "Computer sound only").foregroundStyle(.secondary)
             }
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("Record", selection: $model.includeVideo) {
+                    Text("Screen + Audio (MP4)").tag(true)
+                    Text("Audio Only (M4A)").tag(false)
+                }.pickerStyle(.segmented)
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Save to").font(.caption).foregroundStyle(.secondary)
+                        Text(model.folder.path).font(.callout).lineLimit(2).truncationMode(.middle).help(model.folder.path)
+                    }
+                    Spacer()
+                    Button("Choose…") { model.chooseFolder() }
+                }
+            }.disabled(model.recording || model.busy)
             HStack(spacing: 8) {
                 Circle().fill(model.recording ? Color.red : Color.secondary.opacity(0.5)).frame(width: 8, height: 8)
                 Text(model.phase).fontWeight(.medium)
@@ -139,7 +184,7 @@ struct RecorderView: View {
                 }
                 if let file = model.lastFile { Button("Play Latest") { NSWorkspace.shared.open(file) } }
             }
-            Text("MP4 · Up to 1920 px wide · 30 fps · Microphone off").font(.caption).foregroundStyle(.tertiary)
+            Text(model.includeVideo ? "MP4 · Up to 1920 px wide · 30 fps · Microphone off" : "M4A · Stereo audio · Microphone off").font(.caption).foregroundStyle(.tertiary)
         }.padding(30).frame(width: 390)
     }
 }

@@ -9,10 +9,12 @@ A small native Mac app that records your main screen and computer sound to an MP
 - Start Recording and Stop & Save buttons
 - Recording status and elapsed time
 - Open Recordings and Play Latest buttons
+- Choose screen + computer audio (MP4) or computer audio only (M4A)
+- Choose a save folder; the app remembers the folder and recording mode
 - Computer audio included; microphone off
 - Recorder controls excluded from captured screen
 - H.264 video, up to 1920 pixels wide at 30 fps, with stereo AAC audio
-- Recordings saved in `~/Movies/Screen Recordings`
+- Default save folder: `~/Movies/Screen Recordings`
 
 ## Requirements
 
@@ -35,7 +37,7 @@ This personal build is ad-hoc signed and is not notarized by Apple. macOS may re
    This resets only this app's screen recording approval.
 4. Click **Stop & Save** to finish.
 
-The app records the main display. There is currently no display/window/region selector, microphone option, pause button, or global stop shortcut. Protected content may not be captured.
+The app records the main display. There is currently no display/window/region selector, microphone option, pause button, or global stop shortcut. Audio-only mode extracts M4A audio from a temporary MP4 after stopping and removes the temporary file after a successful export; screen capture permission is still required. Protected content may not be captured.
 
 ## Build
 
